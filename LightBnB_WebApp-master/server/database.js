@@ -81,7 +81,8 @@ const addUser = (user) => {
   INSERT INTO users (name, email, password) 
   VALUES ($1, $2, $3)
   RETURNING *;
-  `, [name, email, password]);
+  `, [name, email, password])
+  .then(res => res.rows);
 }
 
 exports.addUser = addUser;
@@ -120,8 +121,16 @@ const getAllProperties = function (options, limit = 10) {
   let queryString = `
   SELECT properties.*, AVG(property_reviews.rating) AS average_rating
   FROM properties
-  JOIN property_reviews ON property_reviews.property_id = properties.id
+  LEFT JOIN property_reviews ON property_reviews.property_id = properties.id
   `;
+
+  if (options.owner_id) {
+    queryParams.push(`${options.owner_id}`);
+    queryString += `
+    JOIN users ON properties.owner_id = users.id
+    WHERE users.id = $${queryParams.length}
+    `;
+  }
 
   if (options.city || options.minimum_rating || options.minimum_price_per_night || options.maximum_price_per_night) {
     queryString += 'WHERE';
@@ -133,13 +142,6 @@ const getAllProperties = function (options, limit = 10) {
     queryString += ` city LIKE $${queryParams.length}`;
   }
 
-  if (options.owner_id) {
-    queryParams.push(`${options.owner_id}`);
-    queryString += `
-    JOIN users ON properties.owner_id = ${options.owner_id}
-    WHERE users.id = $${queryParams.length}
-    `;
-  }
 
   if (options.minimum_price_per_night) {
     if (options.city || options.maximum_price_per_night || options.minimum_rating) {
@@ -176,7 +178,10 @@ const getAllProperties = function (options, limit = 10) {
 
 
   return pool.query(queryString, queryParams)
-    .then(res => res.rows);
+    .then(res => {
+      console.log(res.rows);
+      return res.rows;
+    });
 }
 
 exports.getAllProperties = getAllProperties;
@@ -204,6 +209,7 @@ const addProperty = (property) => {
   console.log("Adding");
   console.log(queryString, queryParams);
 
-  return pool.query(queryString, queryParams);
+  return pool.query(queryString, queryParams)
+  .then(res => res.rows);
 }
 exports.addProperty = addProperty;
